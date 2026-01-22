@@ -24,7 +24,6 @@ def load_logfile(filename: str, contents: str) -> dict['time': [], 'charge': [],
     simhome = []
     distribution = Distribution("")
     sim_p1: int = 0
-    sim_home: int = 0
 
     def add(value: float) -> None:
         # update time series
@@ -44,27 +43,31 @@ def load_logfile(filename: str, contents: str) -> dict['time': [], 'charge': [],
             # add time point
             time.append((p1time - starttime[0]).total_seconds())
             p1.append(value)
-            home.append(sum(d.sim_home_act for d in devices.values()))
-            solar.append(sum(d.solarPower.asNumber for d in devices.values()))
+            home_act = 0
+            home_org = 0
+            solar_tot = 0
+            for d in devices.values():
+                home_act += d.homePower.asInt
+                home_org += d.sim_home_act
+                solar_tot += d.solarPower.asInt
+            home.append(home_act)
+            solar.append(solar_tot)
+            sim_p1 = (home_org + int(value)) - home_act
+            simp1.append(sim_p1)
 
             # calculate the simulated values
             timeBetweenUpdates = (p1time - starttime[1]).total_seconds()
-            distribution.update(int(value), p1time)
-            sim_home = 0
+            distribution.update(sim_p1, p1time)
             for d in devices.values():
-                sim_home += d.homePower.asInt
                 battery = d.homePower.asInt - d.solarPower.asInt
                 d.sim_avail += (battery / 3600000) * timeBetweenUpdates
                 d.sim_level = int((d.socSet.asNumber - d.minSoc.asNumber) * d.sim_avail / d.kWh)
                 d.level = int(100 * (d.electricLevel.asNumber - d.minSoc.asNumber) / (d.socSet.asNumber - d.minSoc.asNumber))
 
-            simhome.append(sim_home)
-            # sim_p1 = (data.home + data.p1) - sim_home
+            simhome.append(home_act)
  
         # update the distribution
         starttime[1] = p1time
-
-        simp1.append(p1)
 
     try:
         if filename.endswith('.log'):
