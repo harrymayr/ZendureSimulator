@@ -2,6 +2,9 @@
 
 A Python Plotly Dash application for simulating Zendure battery systems. This interactive web application allows you to visualize and analyze the power distribution
 
+## example
+![alt text](image.png)
+
 ## Requirements
 
 - Python 3.8 or higher
