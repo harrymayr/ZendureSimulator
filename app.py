@@ -8,7 +8,6 @@ import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 import pandas as pd
 from datetime import datetime, timedelta
-import numpy as np
 
 # Initialize the Dash app with Bootstrap theme
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -362,9 +361,7 @@ def update_power_graph(data):
     
     fig = go.Figure()
     
-    # Add power flow trace with color based on sign
-    colors = ['red' if p > 0 else 'blue' for p in data['power']]
-    
+    # Add power flow trace
     fig.add_trace(go.Scatter(
         x=data['time'],
         y=data['power'],
