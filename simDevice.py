@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import enum
 import logging
 from typing import Any
 from const import SmartMode
@@ -8,6 +9,14 @@ from simEntity import simEntity
 
 _LOGGER = logging.getLogger(__name__)
 
+class DeviceState(enum.Enum):
+    CREATED = 0
+    OFFLINE = 1
+    NOBATTERY = 2
+    NOFUSEGROUP = 3
+    ACTIVE = 4
+    CALIBRATE = 5
+    HEMS = 6
 
 class ZendureDevice:
     def __init__(self, deviceid: str):
@@ -28,7 +37,8 @@ class ZendureDevice:
         self.sim_pass = False
         self.sim_battery = 0
         self.sim_level = 0
-        self.sim_home_act = 0
+        self.home_org = 0
+        self.status = DeviceState.ACTIVE
 
         self.simP1 = simEntity(self, "simP1")
         self.simHome = simEntity(self, "simHome")
@@ -42,8 +52,8 @@ class ZendureDevice:
         self.socStatus = simEntity(self, "socStatus", state=0)
         self.socLimit = simEntity(self, "socLimit", state=0)
 
-        self.minSoc = simEntity(self, "socMin", state=10)
-        self.socSet = simEntity(self, "socMax", state=90)
+        self.minSoc = simEntity(self, "socMin", state=10, factor=0.1)
+        self.socSet = simEntity(self, "socMax", state=90, factor=0.1)
         self.inputLimit = simEntity(self, "inputLimit")
         self.outputLimit = simEntity(self, "outputLimit")
 
@@ -74,21 +84,21 @@ class ZendureDevice:
 
     def entityUpdate(self, key: str, value: Any) -> None:
         def home(value: int) -> None:
-            if self.power_time > datetime.min and abs(value - self.power_setpoint) < 20:
-                self.power_time = datetime.min
-            self.sim_home_act = value
+            # if self.power_time > datetime.min and abs(value - self.power_setpoint) < 20:
+            #     self.power_time = datetime.min
+            self.home_org = value
             # self.homePower.update_value(value)
 
         match key:
             case "gridInputPower":
                 self.values[0] = value
-                self.homePower.update_value(-value + self.values[1])
+                home(-value + self.values[1])
             case "outputHomePower":
                 self.values[1] = value
                 home(-self.values[0] + value)
             case "outputPackPower":
                 self.values[2] = value
-                home(-value + self.values[3])
+                self.batteryPower.update_value(-value + self.values[3])
             case "packInputPower":
                 self.values[3] = value
                 self.batteryPower.update_value(-self.values[2] + value)
@@ -118,16 +128,25 @@ class ZendureDevice:
 
     def distribute(self, power: int, time: datetime) -> int:
         """Set charge/discharge power, but correct for power offset."""
-        if (delta := time - self.power_time)> 0:
-            if (delta < 1):
-                self.homePower.update_value(self.power_setpoint)
-            return self.power_setpoint
+        # if self.power_time != datetime.min and (delta := (self.power_time - time).total_seconds())> 0:
+        #     if (delta < 1):
+        #         self.homePower.update_value(self.power_setpoint)
+        #     else:
+        #         return self.power_setpoint
 
         pwr = power - self.power_offset
         if (delta := abs(pwr - self.homePower.asInt)) <= SmartMode.POWER_TOLERANCE:
             return self.homePower.asInt + self.power_offset
 
         pwr = min(max(self.limit[0], pwr), self.limit[1])
+
+        # adjust for bypass
+        if self.sim_avail == 100 and self.homePower.asInt < 0:
+            pwr = 0
+        elif self.sim_avail == 0 and self.homePower.asInt < -self.solarPower.asInt:
+            pwr = -self.solarPower.asInt
+
         self.power_setpoint = pwr
-        self.power_time = time + timedelta(seconds=3 + delta / 250)
+        if power != self.power_setpoint:
+            self.power_time = time + timedelta(seconds=3 + delta / 250)
         return pwr + self.power_offset
