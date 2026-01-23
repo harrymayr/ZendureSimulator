@@ -87,6 +87,8 @@ def load_logfile(filename: str, contents: str) -> dict['time': [], 'charge': [],
                 line = line if not line.startswith('\x1b[32m') else line[5:]
                 if (idx := line.find('properties/report') + 22) > 22:
                     data = line[line.find('{'):line.rfind('}') + 1].replace("\'", "\"").replace(" True", " true")
+                    if len(data) == 0:
+                        continue
                     try:
                         payload = json.loads(data)
                     except Exception as ex:
