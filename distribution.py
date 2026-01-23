@@ -99,7 +99,6 @@ class Distribution:
 
             # distribute power
             if solarOnly:
-                # setpoint -= solar
                 for d in sorted(self.devices, key=self.sortdischarge, reverse=False):
                     setpoint -= d.distribute(min(setpoint, d.solarPower.asInt), time)
             else:
