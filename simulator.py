@@ -103,7 +103,7 @@ def load_logfile(filename: str, contents: str) -> dict['time': [], 'charge': [],
                     add(int(line[idx:line.find('W', idx)]))
                 elif (idx := line.find('Update operation: ') + 18) > 18:
                     operation = line[idx:line.find(' ', idx)]
-                    distribution.set_operation(ManagerMode(int(operation)))
+                    distribution.set_operation(ManagerMode[operation.split(".")[-1]])
 
     except Exception as e:
         _LOGGER.error("Error loading logfile: %s", e)
