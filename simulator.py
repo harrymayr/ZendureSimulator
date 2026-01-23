@@ -90,7 +90,7 @@ def load_logfile(filename: str, contents: str) -> dict['time': [], 'charge': [],
                     try:
                         payload = json.loads(data)
                     except Exception as ex:
-                        _LOGGER.error("JSON decode error in logfile line: %s", ex)
+                        _LOGGER.error("JSON decode error in logfile line: %s, error: %s", line, ex)
                         continue
                     if (payload is not None and (deviceid := payload.get('deviceId'))):
                         if (sim := devices.get(deviceid)) is None:
