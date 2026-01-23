@@ -10,7 +10,7 @@ from typing import Callable
 
 from simEntity import simEntity
 from const import ManagerMode, SmartMode
-from simDevice import ZendureDevice
+from simDevice import DeviceState, ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ class Distribution:
         self.Max: list[Callable[[int, int], int]] = [min, max]
         self.Min: list[Callable[[int, int], int]] = [max, min]
         self.start: list[int] = [-CONST_POWER_START, CONST_POWER_START]
-        self.setpoint_history: deque[int] = deque([0], maxlen=5)
+        self.setpoint_history: deque[int] = deque([0], maxlen=4)
         self.p1_avg = 0.0
         self.p1_factor = 1
         self.devices: list[ZendureDevice] = []
@@ -40,22 +40,23 @@ class Distribution:
         self.setpoint = 0
         self.operation: ManagerMode = ManagerMode.OFF
         self.manualpower = 0
+        self.seconds = 0
 
 
     def set_operation(self, operation: ManagerMode) -> None:
         """Set the operation mode."""
         self.operation = operation
-        if self.p1meterEvent is not None:
-            if operation != ManagerMode.OFF and (len(self.devices) == 0 or all(d.status == DeviceState.ACTIVE for d in self.devices)):
-                _LOGGER.warning("No devices online, not possible to start the operation")
-                # persistent_notification.async_create(self.hass, "No devices online, not possible to start the operation", "Zendure", "zendure_ha")
-                return
+        # if self.p1meterEvent is not None:
+        #     if operation != ManagerMode.OFF and (len(self.devices) == 0 or all(d.status == DeviceState.ACTIVE for d in self.devices)):
+        #         _LOGGER.warning("No devices online, not possible to start the operation")
+        #         persistent_notification.async_create(self.hass, "No devices online, not possible to start the operation", "Zendure", "zendure_ha")
+        #         return
 
-            match self.operation:
-                case ManagerMode.OFF:
-                    if len(self.devices) > 0:
-                        for d in self.devices:
-                            d.power_off()
+        #     match self.operation:
+        #         case ManagerMode.OFF:
+        #             if len(self.devices) > 0:
+        #                 for d in self.devices:
+        #                     d.power_off()
 
     # @callback
     # def _p1_changed(self, event: Event[EventStateChangedData]) -> None:
@@ -74,8 +75,7 @@ class Distribution:
         try:
             # update the setpoint, and determine solar only mode
             setpoint, solar = self.get_setpoint(p1)
-            solarOnly = setpoint < 0 and solar >= abs(setpoint)
-            setpoint += solar
+            solarOnly = solar > setpoint
             self.setpoint_sensor.update_value(setpoint)
 
             # calculate average and delta setpoint
@@ -85,8 +85,8 @@ class Distribution:
                 if (setpoint * avg) < 0:
                     setpoint = 0
             self.setpoint_history.append(setpoint)
-            setpoint = int(0.75 * setpoint) if delta > CONST_POWER_JUMP_HIGH else (setpoint + 2 * avg) // 3
-
+            setpoint = int(0.75 * setpoint) if not solarOnly and delta > CONST_POWER_JUMP_HIGH else (setpoint + 2 * avg) // 3
+            
             match self.operation:
                 case ManagerMode.MATCHING_DISCHARGE:
                     setpoint = max(setpoint, 0)
@@ -99,8 +99,9 @@ class Distribution:
 
             # distribute power
             if solarOnly:
-                for d in self.devices:
-                    setpoint -= d.distribute(max(setpoint, -d.solarPower.asInt), time)
+                # setpoint -= solar
+                for d in sorted(self.devices, key=self.sortdischarge, reverse=False):
+                    setpoint -= d.distribute(min(setpoint, d.solarPower.asInt), time)
             else:
                 idx = 0 if setpoint < 0 else 1
                 self.distrbute(setpoint, idx, self.weights[idx], time)
@@ -115,17 +116,15 @@ class Distribution:
         for d in self.devices:
             if d.status != DeviceState.ACTIVE or d.fuseGrp is None:
                 continue
-            home = d.homePower.asInt
-            d.power_offset = d.solarPower.asInt
+            setpoint += d.homePower.asInt
+            solar += d.solarPower.asInt
             d.fuseGrp.initPower = True
-            solar += d.power_offset
             if d.offGrid is not None:
                 if (off_grid := d.offGrid.asInt) < 0:
-                    home += off_grid
-                else:
                     solar += off_grid
+                else:
+                    setpoint += off_grid
                 d.power_offset += min(0, off_grid)
-            setpoint += home
 
         return (setpoint, solar)
 
@@ -164,7 +163,7 @@ class Distribution:
             flexible = 0 if fixedpct < CONST_FIXED else setpoint - CONST_FIXED * totalpower
             totalpower -= d.power_limit
             weight = deviceWeight(d)
-            power = int(fixedpct * d.limit[idx] + flexible * (weight / totalweight)) if totalpower != 0 else setpoint
+            power = 0 if totalweight == 0 else int(fixedpct * d.limit[idx] + flexible * (weight / totalweight)) if totalpower != 0 else setpoint
             power = self.Min[idx](d.limit[idx], self.Max[idx](power, setpoint - totalpower))
             setpoint -= d.distribute(power, time)
 

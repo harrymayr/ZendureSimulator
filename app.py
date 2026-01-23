@@ -208,8 +208,17 @@ def update_power_graph(data):
         yaxis_title='Power (W)',
         template='plotly_white',
         hovermode='x unified',
-        showlegend=True
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
     )
+
+    fig.update_layout()
     
     return fig
 

@@ -3,6 +3,7 @@ from datetime import datetime
 import json
 import logging
 import traceback
+from const import ManagerMode
 from distribution import Distribution
 from simDevice import ZendureDevice
 
@@ -23,49 +24,57 @@ def load_logfile(filename: str, contents: str) -> dict['time': [], 'charge': [],
     simp1 = []
     simhome = []
     distribution = Distribution("")
-    sim_p1: int = 0
+    distribution.set_operation(ManagerMode.MATCHING)
 
-    def add(value: float) -> None:
+    def add(newP1: int) -> None:
         # update time series
         try:
             p1time=datetime.strptime(line[:23],"%Y-%m-%d %H:%M:%S.%f")
         except Exception:
             return
 
+        sim_home = 0
+        home_org = 0
+        solar_tot = 0
         if len(starttime) == 0:
             starttime.append(p1time)
             starttime.append(p1time)
-            sim_p1 = value
+            sim_p1 = newP1
             for d in devices.values():
                 d.sim_avail = d.availableKwh.asNumber
-                d.homePower.update_value(d.sim_home_act)
-        else:
-            # add time point
-            time.append((p1time - starttime[0]).total_seconds())
-            p1.append(value)
-            home_act = 0
-            home_org = 0
-            solar_tot = 0
-            for d in devices.values():
-                home_act += d.homePower.asInt
-                home_org += d.sim_home_act
+                d.sim_level = int((d.socSet.asNumber - d.minSoc.asNumber) * d.sim_avail / d.kWh)
+                d.homePower.update_value(d.home_org)
+                sim_home += d.home_org
+                home_org += d.home_org
                 solar_tot += d.solarPower.asInt
-            home.append(home_act)
-            solar.append(solar_tot)
-            sim_p1 = (home_org + int(value)) - home_act
-            simp1.append(sim_p1)
 
-            # calculate the simulated values
+            distribution.devices = list(devices.values())
+        else:
+            # calculate the totals
+            distribution.seconds = (p1time - starttime[0]).total_seconds()
+            time.append(distribution.seconds)
             timeBetweenUpdates = (p1time - starttime[1]).total_seconds()
-            distribution.update(sim_p1, p1time)
             for d in devices.values():
+                # Update the totals
+                d.homePower.update_value(d.power_setpoint)
+                sim_home += d.power_setpoint
+                home_org += d.home_org
+                solar_tot += d.solarPower.asInt
+
+                # update the level
                 battery = d.homePower.asInt - d.solarPower.asInt
                 d.sim_avail += (battery / 3600000) * timeBetweenUpdates
                 d.sim_level = int((d.socSet.asNumber - d.minSoc.asNumber) * d.sim_avail / d.kWh)
-                d.level = int(100 * (d.electricLevel.asNumber - d.minSoc.asNumber) / (d.socSet.asNumber - d.minSoc.asNumber))
+                d.level = d.sim_level
+            sim_p1 = (home_org + newP1) - sim_home
 
-            simhome.append(home_act)
- 
+        p1.append(newP1)
+        home.append(home_org)
+        solar.append(solar_tot)
+        simp1.append(sim_p1)
+        distribution.update(sim_p1, p1time)
+        simhome.append(sum(d.power_setpoint for d in devices.values()))
+
         # update the distribution
         starttime[1] = p1time
 
@@ -94,7 +103,7 @@ def load_logfile(filename: str, contents: str) -> dict['time': [], 'charge': [],
                     add(int(line[idx:line.find('W', idx)]))
                 elif (idx := line.find('Update operation: ') + 18) > 18:
                     operation = line[idx:line.find(' ', idx)]
-                    _LOGGER.debug("Update operation: %s", operation)
+                    distribution.set_operation(ManagerMode(int(operation)))
 
     except Exception as e:
         _LOGGER.error("Error loading logfile: %s", e)
