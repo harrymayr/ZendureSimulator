@@ -66,7 +66,7 @@ def load_logfile(filename: str, contents: str) -> dict['time': [], 'charge': [],
                 off_grid += d.offGrid.asInt
 
                 # update the level
-                battery = d.homePower.asInt - d.solarPower.asInt - d.offGrid.asInt
+                battery = d.homePower.asInt - d.solarPower.asInt + d.offGrid.asInt
                 avail = d.availableKwh.asNumber + (battery / 3600000) * timeBetweenUpdates
                 avail_max = d.kWh * (d.socSet.asNumber - d.minSoc.asNumber) / 100
                 avail = max(0, min(avail, avail_max))
@@ -106,6 +106,7 @@ def load_logfile(filename: str, contents: str) -> dict['time': [], 'charge': [],
                     if (payload is not None and (deviceid := payload.get('deviceId'))):
                         if (sim := devices.get(deviceid)) is None:
                             sim = ZendureDevice(deviceid)
+                            distribution.devices.append(sim)
                             devices[deviceid] = sim
                         sim.readEntities(payload)
                 elif (idx := line.find('P1 ======>') + 14) > 14:

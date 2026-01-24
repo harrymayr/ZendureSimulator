@@ -153,9 +153,6 @@ class Distribution:
                 # Stop the device
                 d.distribute(0, time)
 
-        if self.seconds > 63000:
-            _LOGGER.error("Simulation time exceeded 60000 seconds, stopping further processing.")
-
         if totalpower == 0 or totalweight == 0.0:
             return
 

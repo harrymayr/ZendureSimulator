@@ -137,10 +137,10 @@ class ZendureDevice:
         pwr = min(max(self.limit[0], pwr), self.limit[1])
 
         # adjust for bypass
-        if self.level == 100 and self.homePower.asInt < 0:
+        if pwr < 0 and  self.level >= 99.99:
             pwr = 0
-        elif self.level == 0 and self.homePower.asInt < -self.solarPower.asInt:
-            pwr = -self.solarPower.asInt
+        elif self.level == 0:
+            pwr = min(self.solarPower.asInt, pwr)
 
         self.power_setpoint = pwr
         if power != self.power_setpoint:
