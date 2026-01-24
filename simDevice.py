@@ -25,7 +25,7 @@ class ZendureDevice:
         self.name = deviceid
         self.batteries: dict[str, ZendureBattery | None] = {}
         self.kWh = 4.0
-        self.limit = [0, 0]
+        self.limit = [-1200, 1200]
         self.level = 0
         self.fuseGrp: FuseGroup = FuseGroup(self.name, 3200, -3200, devices=[self])  # Default empty fuse group
         self.values = [0, 0, 0, 0]
@@ -33,10 +33,7 @@ class ZendureDevice:
         self.power_time = datetime.min
         self.power_offset = 0
         self.power_limit = 0
-        self.sim_avail = 0.0
-        self.sim_pass = False
         self.sim_battery = 0
-        self.sim_level = 0
         self.home_org = 0
         self.status = DeviceState.ACTIVE
 
@@ -109,12 +106,10 @@ class ZendureDevice:
                     self.offGrid.update_value(value)
             case "electricLevel":
                 self.electricLevel.update_value(value)
-                self.level = int(100 * (self.electricLevel.asNumber - self.minSoc.asNumber) / (self.socSet.asNumber - self.minSoc.asNumber))
-                self.availableKwh.update_value(round(self.kWh * self.level / 100, 2))
             case "inverseMaxPower":
-                self.setLimits(self.inputLimit.asInt, value)
+                self.setLimits(self.limit[0], value)
             case "chargeLimit" | "chargeMaxLimit":
-                self.setLimits(-value, self.outputLimit.asInt)
+                self.setLimits(-value, self.limit[1])
             case _:
                 if entity := self.__dict__.get(key):
                     entity.update_value(value)
@@ -123,6 +118,8 @@ class ZendureDevice:
         try:
             """Set the device limits."""
             self.limit = [charge, discharge]
+            self.inputLimit.update_value(charge)
+            self.outputLimit.update_value(discharge)
         except Exception:
             _LOGGER.error(f"SetLimits error {self.name} {charge} {discharge}!")
 
@@ -134,16 +131,15 @@ class ZendureDevice:
         #     else:
         #         return self.power_setpoint
 
-        pwr = power - self.power_offset
+        pwr = power + self.power_offset
         if (delta := abs(pwr - self.homePower.asInt)) <= SmartMode.POWER_TOLERANCE:
-            return self.homePower.asInt + self.power_offset
-
+            return self.homePower.asInt - self.power_offset
         pwr = min(max(self.limit[0], pwr), self.limit[1])
 
         # adjust for bypass
-        if self.sim_avail == 100 and self.homePower.asInt < 0:
+        if self.level == 100 and self.homePower.asInt < 0:
             pwr = 0
-        elif self.sim_avail == 0 and self.homePower.asInt < -self.solarPower.asInt:
+        elif self.level == 0 and self.homePower.asInt < -self.solarPower.asInt:
             pwr = -self.solarPower.asInt
 
         self.power_setpoint = pwr

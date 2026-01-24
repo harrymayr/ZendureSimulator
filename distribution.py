@@ -75,7 +75,7 @@ class Distribution:
         try:
             # update the setpoint, and determine solar only mode
             setpoint, solar = self.get_setpoint(p1)
-            solarOnly = solar > setpoint
+            solarOnly = setpoint > 0 and solar > setpoint
             self.setpoint_sensor.update_value(setpoint)
 
             # calculate average and delta setpoint
@@ -120,10 +120,10 @@ class Distribution:
             d.fuseGrp.initPower = True
             if d.offGrid is not None:
                 if (off_grid := d.offGrid.asInt) < 0:
-                    solar += off_grid
+                    solar += -off_grid
                 else:
                     setpoint += off_grid
-                d.power_offset += min(0, off_grid)
+                d.power_offset = max(0, off_grid)
 
         return (setpoint, solar)
 
@@ -152,6 +152,9 @@ class Distribution:
             else:
                 # Stop the device
                 d.distribute(0, time)
+
+        if self.seconds > 63000:
+            _LOGGER.error("Simulation time exceeded 60000 seconds, stopping further processing.")
 
         if totalpower == 0 or totalweight == 0.0:
             return

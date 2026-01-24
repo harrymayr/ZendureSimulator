@@ -21,6 +21,7 @@ def load_logfile(filename: str, contents: str) -> dict['time': [], 'charge': [],
     p1 = []
     home = []
     solar = []
+    offgrid = []
     simp1 = []
     simhome = []
     distribution = Distribution("")
@@ -35,18 +36,20 @@ def load_logfile(filename: str, contents: str) -> dict['time': [], 'charge': [],
 
         sim_home = 0
         home_org = 0
+        off_grid = 0
         solar_tot = 0
         if len(starttime) == 0:
             starttime.append(p1time)
             starttime.append(p1time)
             sim_p1 = newP1
             for d in devices.values():
-                d.sim_avail = d.availableKwh.asNumber
-                d.sim_level = int((d.socSet.asNumber - d.minSoc.asNumber) * d.sim_avail / d.kWh)
+                d.availableKwh.update_value(d.kWh * (d.electricLevel.asNumber - d.minSoc.asNumber) / 100)
+                d.level = int((d.socSet.asNumber - d.minSoc.asNumber) * d.availableKwh.asNumber / d.kWh)
                 d.homePower.update_value(d.home_org)
                 sim_home += d.home_org
                 home_org += d.home_org
                 solar_tot += d.solarPower.asInt
+                off_grid += d.offGrid.asInt
 
             distribution.devices = list(devices.values())
         else:
@@ -60,18 +63,24 @@ def load_logfile(filename: str, contents: str) -> dict['time': [], 'charge': [],
                 sim_home += d.power_setpoint
                 home_org += d.home_org
                 solar_tot += d.solarPower.asInt
+                off_grid += d.offGrid.asInt
 
                 # update the level
-                battery = d.homePower.asInt - d.solarPower.asInt
-                d.sim_avail += (battery / 3600000) * timeBetweenUpdates
-                d.sim_level = int((d.socSet.asNumber - d.minSoc.asNumber) * d.sim_avail / d.kWh)
-                d.level = d.sim_level
-            sim_p1 = (home_org + newP1) - sim_home
+                battery = d.homePower.asInt - d.solarPower.asInt - d.offGrid.asInt
+                avail = d.availableKwh.asNumber + (battery / 3600000) * timeBetweenUpdates
+                avail_max = d.kWh * (d.socSet.asNumber - d.minSoc.asNumber) / 100
+                avail = max(0, min(avail, avail_max))
+                d.availableKwh.update_value(avail)
+                d.level = avail / avail_max * 100 if avail_max > 0 else 0
+
+            sim_p1 = (home_org + newP1) - sim_home + off_grid
 
         p1.append(newP1)
         home.append(home_org)
         solar.append(solar_tot)
+        offgrid.append(off_grid)
         simp1.append(sim_p1)
+
         distribution.update(sim_p1, p1time)
         simhome.append(sum(d.power_setpoint for d in devices.values()))
 
@@ -105,7 +114,7 @@ def load_logfile(filename: str, contents: str) -> dict['time': [], 'charge': [],
                     add(int(line[idx:line.find('W', idx)]))
                 elif (idx := line.find('Update operation: ') + 18) > 18:
                     operation = line[idx:line.find(' ', idx)]
-                    distribution.set_operation(ManagerMode(int(operation)) if isinstance(operation, int) else ManagerMode[operation.split(".")[-1]])
+                    distribution.set_operation(ManagerMode(int(operation)) if operation.isnumeric() else ManagerMode[operation.split(".")[-1]])
 
     except Exception as e:
         _LOGGER.error("Error loading logfile: %s", e)
@@ -121,5 +130,6 @@ def load_logfile(filename: str, contents: str) -> dict['time': [], 'charge': [],
         'home': home,
         'solar': solar,
         'simp1': simp1,
-        'simhome': simhome
+        'simhome': simhome,
+        'offgrid': offgrid
     }

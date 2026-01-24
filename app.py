@@ -200,6 +200,14 @@ def update_power_graph(data):
         line=dict(color='brown', width=2),
     ))
     
+    fig.add_trace(go.Scatter(
+        x=data['time'],
+        y=data['offgrid'],
+        mode='lines',
+        name='Offgrid',
+        line=dict(color='red', width=2),
+    ))
+    
     # Add zero line
     fig.add_hline(y=0, line_dash="dash", line_color="gray")
     
