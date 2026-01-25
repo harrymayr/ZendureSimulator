@@ -10,7 +10,7 @@ from simDevice import ZendureDevice
 _LOGGER = logging.getLogger(__name__)
 
 @staticmethod
-def load_logfile(filename: str, contents: str) -> dict['time': [], 'charge': [], 'p1': [], 'home': [], 'solar': [], 'simp1': [], 'simhome': []]:
+def load_logfile(filename: str, contents: str) -> dict['time': [], 'charge': [], 'p1': [], 'home': [], 'solar': [], 'simp1': [], 'simhome': [], 'setpoint': []]:
     """Load simulation data from a logfile."""
     content_type, content_string = contents.split(',')
     decoded = base64.b64decode(content_string)
@@ -24,6 +24,7 @@ def load_logfile(filename: str, contents: str) -> dict['time': [], 'charge': [],
     offgrid = []
     simp1 = []
     simhome = []
+    setpoint = []
     distribution = Distribution("")
     distribution.set_operation(ManagerMode.MATCHING)
 
@@ -38,6 +39,7 @@ def load_logfile(filename: str, contents: str) -> dict['time': [], 'charge': [],
         home_org = 0
         off_grid = 0
         solar_tot = 0
+        charges = []
         if len(starttime) == 0:
             starttime.append(p1time)
             starttime.append(p1time)
@@ -50,6 +52,7 @@ def load_logfile(filename: str, contents: str) -> dict['time': [], 'charge': [],
                 home_org += d.home_org
                 solar_tot += d.solarPower.asInt
                 off_grid += d.offGrid.asInt
+                charges.append(d.electricLevel.asNumber)
 
             distribution.devices = list(devices.values())
         else:
@@ -72,17 +75,19 @@ def load_logfile(filename: str, contents: str) -> dict['time': [], 'charge': [],
                 avail = max(0, min(avail, avail_max))
                 d.availableKwh.update_value(avail)
                 d.level = avail / avail_max * 100 if avail_max > 0 else 0
+                charges.append(d.electricLevel.asNumber)
 
             sim_p1 = (home_org + newP1) - sim_home + off_grid
 
-        p1.append(newP1)
-        home.append(home_org)
-        solar.append(solar_tot)
-        offgrid.append(off_grid)
-        simp1.append(sim_p1)
+            p1.append(newP1)
+            home.append(home_org + newP1)
+            solar.append(solar_tot)
+            offgrid.append(off_grid)
+            simp1.append(sim_p1)
+            charge.append(charges)
+            simhome.append(sum(d.power_setpoint for d in devices.values()))
 
         distribution.update(sim_p1, p1time)
-        simhome.append(sum(d.power_setpoint for d in devices.values()))
 
         # update the distribution
         starttime[1] = p1time
@@ -111,8 +116,14 @@ def load_logfile(filename: str, contents: str) -> dict['time': [], 'charge': [],
                         sim.readEntities(payload)
                 elif (idx := line.find('P1 ======>') + 14) > 14:
                     add(int(line[idx:line.find(' ', idx)]))
+                    idx = line.find('setpoint:', idx)
+                    if idx > 0:
+                        setpoint.append(int(line[idx + 9:line.find('W', idx)]))
                 elif (idx := line.find('P1 power changed => ') + 20) > 20:
                     add(int(line[idx:line.find('W', idx)]))
+                    idx = line.find('actual:', idx)
+                    if idx > 0:
+                        setpoint.append(int(line[idx + 8:line.find('W', idx)]))
                 elif (idx := line.find('Update operation: ') + 18) > 18:
                     operation = line[idx:line.find(' ', idx)]
                     distribution.set_operation(ManagerMode(int(operation)) if operation.isnumeric() else ManagerMode[operation.split(".")[-1]])
@@ -132,5 +143,6 @@ def load_logfile(filename: str, contents: str) -> dict['time': [], 'charge': [],
         'solar': solar,
         'simp1': simp1,
         'simhome': simhome,
-        'offgrid': offgrid
+        'offgrid': offgrid,
+        'setpoint': setpoint
     }

@@ -35,6 +35,7 @@ class ZendureDevice:
         self.power_limit = 0
         self.sim_battery = 0
         self.home_org = 0
+        self.batout = 0
         self.status = DeviceState.ACTIVE
 
         self.simP1 = simEntity(self, "simP1")
@@ -63,8 +64,8 @@ class ZendureDevice:
         if (properties := payload.get("properties")) and len(properties) > 0:
             for key, value in properties.items():
                 self.entityUpdate(key, value)
-
         if batprops := payload.get("packData"):
+            self.batout = 0
             for b in batprops:
                 if (sn := b.get("sn", None)) is None:
                     continue
@@ -74,25 +75,19 @@ class ZendureDevice:
                     self.kWh = sum(0 if b is None else b.kWh for b in self.batteries.values())
                     self.batteryUpdate()
                 elif bat and b:
-                    bat.entityRead(b)
+                    self.batout += bat.entityRead(b)
+        self.home_org = -self.values[0] + (self.offGrid.asInt - self.batout) if self.values[0] > 0 and self.offGrid is not None and self.offGrid.asInt > 0 else 0 + self.values[1]
 
     def batteryUpdate(self) -> None:
         """Update device based on battery status."""
 
     def entityUpdate(self, key: str, value: Any) -> None:
-        def home(value: int) -> None:
-            # if self.power_time > datetime.min and abs(value - self.power_setpoint) < 20:
-            #     self.power_time = datetime.min
-            self.home_org = value
-            # self.homePower.update_value(value)
 
         match key:
             case "gridInputPower":
                 self.values[0] = value
-                home(-value + self.values[1])
             case "outputHomePower":
                 self.values[1] = value
-                home(-self.values[0] + value)
             case "outputPackPower":
                 self.values[2] = value
                 self.batteryPower.update_value(-value + self.values[3])

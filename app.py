@@ -63,7 +63,9 @@ app.layout = dbc.Container([
         'home': [],
         'solar': [],
         'simp1': [],
-        'simhome': []
+        'simhome': [],
+        'offgrid': [],
+        'setpoint': []
     })
     # dcc.Interval(id='interval-component', interval=1000, n_intervals=0, disabled=True),
     
@@ -112,16 +114,17 @@ def update_charge_graph(data):
     
     fig = go.Figure()
     
-    # Add charge level trace
-    fig.add_trace(go.Scatter(
-        x=data['time'],
-        y=data['charge'],
-        mode='lines',
-        name='Charge Level',
-        line=dict(color='green', width=2),
-        fill='tozeroy',
-        fillcolor='rgba(0, 255, 0, 0.1)'
-    ))
+    # Add charge level traces for each battery
+    columns = list(zip(*data['charge']))
+    for idx, charge_series in enumerate(columns):
+        fig.add_trace(go.Scatter(
+            x=data['time'],
+            y=charge_series,
+            mode='lines',
+            name=f'Battery {idx + 1} Charge Level',
+            line=dict(width=2),
+            opacity=0.5
+        ))
     
     # Add warning zone
     fig.add_hrect(y0=0, y1=20, fillcolor="red", opacity=0.1, line_width=0)
@@ -206,6 +209,14 @@ def update_power_graph(data):
         mode='lines',
         name='Offgrid',
         line=dict(color='red', width=2),
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=data['time'],
+        y=data['setpoint'],
+        mode='lines',
+        name='Setpoint',
+        line=dict(color='green', width=2),
     ))
     
     # Add zero line
