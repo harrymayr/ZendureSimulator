@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import enum
 import logging
 import traceback
 from collections import deque
@@ -22,10 +23,16 @@ CONST_HIGH = 0.55
 CONST_LOW = 0.15
 
 
+class DistributionMode(enum.Enum):
+    NEUTRAL = 0
+    MAXSOLAR = 1
+    MINBUYING = 2
+
+
 class Distribution:
     """Manage power distribution for Zendure devices."""
 
-    def __init__(self, p1meter: str) -> None:
+    def __init__(self, p1meter: str, mode: DistributionMode, start_power: int, power_tolerance: int) -> None:
         """Initialize Zendure Manager."""
         self.weights: list[Callable[[ZendureDevice], float]] = [self.weightcharge, self.weightdischarge]
         self.sorts: list[Callable[[ZendureDevice], float]] = [self.sortcharge, self.sortdischarge]
@@ -41,7 +48,9 @@ class Distribution:
         self.operation: ManagerMode = ManagerMode.OFF
         self.manualpower = 0
         self.seconds = 0
-
+        self.mode = mode
+        self.start_power = start_power
+        self.power_tolerance = power_tolerance
 
     def set_operation(self, operation: ManagerMode) -> None:
         """Set the operation mode."""
@@ -85,7 +94,7 @@ class Distribution:
                 if (setpoint * avg) < 0:
                     setpoint = 0
             self.setpoint_history.append(setpoint)
-            setpoint = int(0.75 * setpoint) if not solarOnly and delta > CONST_POWER_JUMP_HIGH else (setpoint + 2 * avg) // 3
+            setpoint = int(0.75 * setpoint) if not solarOnly and delta > CONST_POWER_JUMP_HIGH else setpoint
             
             match self.operation:
                 case ManagerMode.MATCHING_DISCHARGE:
@@ -122,7 +131,7 @@ class Distribution:
                 if (off_grid := d.offGrid.asInt) < 0:
                     solar += -off_grid
                 else:
-                    setpoint += off_grid
+                    setpoint -= off_grid
                 d.power_offset = max(0, off_grid)
 
         return (setpoint, solar)
@@ -136,8 +145,9 @@ class Distribution:
         for d in sorted(self.devices, key=self.sorts[idx], reverse=idx == 1):
             if d.status != DeviceState.ACTIVE or d.fuseGrp is None:
                 continue
-            weight = deviceWeight(d)
-            if d.homePower.asInt == 0:
+            if (weight := deviceWeight(d)) == 0.0:
+                d.distribute(0, time)
+            elif d.homePower.asInt == 0:
                 # Check if we must start this device
                 if startdevice := weight > 0 and start != 0:
                     start = self.Max[idx](0, int(start - d.limit[idx] * CONST_HIGH))
