@@ -17,7 +17,7 @@ _LOGGER = logging.getLogger(__name__)
 
 CONST_POWER_START = 50
 CONST_POWER_JUMP = 100
-CONST_POWER_JUMP_HIGH = 250
+CONST_POWER_JUMP_HIGH = 300
 CONST_FIXED = 0.1
 CONST_HIGH = 0.55
 CONST_LOW = 0.15
@@ -89,12 +89,14 @@ class Distribution:
 
             # calculate average and delta setpoint
             avg = int(sum(self.setpoint_history) / len(self.setpoint_history))
-            if (delta := abs(avg - setpoint)) > CONST_POWER_JUMP:
+            if (abs(delta := avg - setpoint)) > CONST_POWER_JUMP:
                 self.setpoint_history.clear()
-                if (setpoint * avg) < 0:
-                    setpoint = 0
+                if delta > CONST_POWER_JUMP_HIGH:
+                    setpoint = int(avg - 0.75 * delta)
+
+            if (setpoint * avg) < 0:
+                setpoint = 0
             self.setpoint_history.append(setpoint)
-            setpoint = int(0.75 * setpoint) if not solarOnly and delta > CONST_POWER_JUMP_HIGH else setpoint
             
             match self.operation:
                 case ManagerMode.MATCHING_DISCHARGE:
