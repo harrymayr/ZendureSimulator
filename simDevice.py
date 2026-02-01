@@ -19,7 +19,7 @@ class DeviceState(enum.Enum):
     HEMS = 6
 
 class ZendureDevice:
-    def __init__(self, deviceid: str):
+    def __init__(self, deviceid: str, count: int):
         from fusegroup import CONST_EMPTY_GROUP, FuseGroup
         self.deviceid = deviceid
         self.name = deviceid
@@ -33,13 +33,7 @@ class ZendureDevice:
         self.power_time = datetime.min
         self.power_offset = 0
         self.power_limit = 0
-        self.sim_battery = 0
-        self.home_org = 0
-        self.batout = 0
         self.status = DeviceState.ACTIVE
-
-        self.simP1 = simEntity(self, "simP1")
-        self.simHome = simEntity(self, "simHome")
 
         self.electricLevel = simEntity(self, "electricLevel")
         self.homePower = simEntity(self, "homePower")
@@ -59,6 +53,15 @@ class ZendureDevice:
         self.connectionStatus = simEntity(self, "connectionStatus", state=0)
         self.byPass = simEntity(self, "pass")
         self.fuseGroup = simEntity(self, "fuseGroup")
+        self.solar = []
+        self.offgrid = []
+        self.levels = []
+        self.startindex = -1
+        while len(self.solar) < count:
+            self.solar.append(0)
+            self.offgrid.append(0)
+            self.levels.append(0)
+        self.sim_level = []
         
     def readEntities(self, payload: dict):
         if (properties := payload.get("properties")) and len(properties) > 0:
@@ -82,6 +85,10 @@ class ZendureDevice:
         """Update device based on battery status."""
 
     def entityUpdate(self, key: str, value: Any) -> None:
+        def home(value: int) -> None:
+            # if self.power_time > datetime.min and abs(value - self.power_setpoint) < 20:
+            #     self.power_time = datetime.min
+            self.homePower.update_value(value)
 
         match key:
             case "gridInputPower":
@@ -132,9 +139,9 @@ class ZendureDevice:
         pwr = min(max(self.limit[0], pwr), self.limit[1])
 
         # adjust for bypass
-        if pwr < 0 and  self.level >= 99.99:
+        if pwr < 0 and  self.level >= 99:
             pwr = 0
-        elif self.level == 0:
+        elif self.level <= 1:
             pwr = min(self.solarPower.asInt, pwr)
 
         self.power_setpoint = pwr
