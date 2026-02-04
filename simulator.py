@@ -54,7 +54,7 @@ class ZendureSimulator:
 
             self.time.append(p1time)
             self.p1.append(newP1)
-            self.home.append(home_total)
+            self.home.append(home_total + newP1)
             self.solar.append(solar_total)
             self.offgrid.append(offgrid_total)
         try:

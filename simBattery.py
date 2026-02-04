@@ -46,9 +46,10 @@ class ZendureBattery:
         self.maxVol = simEntity(self, "maxVol")
         self.minVol = simEntity(self, "minVol")
         
-    def entityRead(self, payload: dict) -> None:
+    def entityRead(self, payload: dict) -> int:
         """Handle incoming MQTT message for the battery."""
         for key, value in payload.items():
             entity = self.__dict__.get(key)
             if key != "sn" and (entity := self.__dict__.get(key)):
                 entity.update_value(value)
+        return self.power.asInt
