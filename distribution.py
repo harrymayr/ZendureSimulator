@@ -133,7 +133,7 @@ class Distribution:
                 if (off_grid := d.offGrid.asInt) < 0:
                     solar += -off_grid
                 else:
-                    setpoint -= off_grid
+                    setpoint += off_grid if d.homePower.asInt <= 0 else 0
                 d.power_offset = max(0, off_grid)
 
         return (setpoint, solar)
@@ -147,7 +147,7 @@ class Distribution:
         for d in sorted(self.devices, key=self.sorts[idx], reverse=idx == 1):
             if d.status != DeviceState.ACTIVE or d.fuseGrp is None:
                 continue
-            if (weight := deviceWeight(d)) == 0.0:
+            if (weight := deviceWeight(d)) == 0.0 and d.offGrid is not None and d.offGrid.asInt <= 0:
                 d.distribute(0, time)
             elif d.homePower.asInt == 0:
                 # Check if we must start this device

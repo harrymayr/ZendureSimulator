@@ -25,7 +25,7 @@ class ZendureDevice:
         self.name = deviceid
         self.batteries: dict[str, ZendureBattery | None] = {}
         self.kWh = 4.0
-        self.limit = [-1200, 1200]
+        self.limit = [-2400, 2400]
         self.level = 0
         self.fuseGrp: FuseGroup = FuseGroup(self.name, 3200, -3200, devices=[self])  # Default empty fuse group
         self.values = [0, 0, 0, 0]
@@ -130,7 +130,7 @@ class ZendureDevice:
         #     else:
         #         return self.power_setpoint
 
-        pwr = power + self.power_offset
+        pwr = power #+ self.power_offset
         if (delta := abs(pwr - self.homePower.asInt)) <= SmartMode.POWER_TOLERANCE:
             return self.homePower.asInt - self.power_offset
         pwr = min(max(self.limit[0], pwr), self.limit[1])
@@ -138,7 +138,7 @@ class ZendureDevice:
         # adjust for bypass
         if pwr < 0 and  self.level >= 99:
             pwr = 0
-        elif self.level <= 1:
+        elif self.level <= 1 and self.offGrid is not None and self.offGrid.asInt <= 0:
             pwr = min(self.solarPower.asInt, pwr)
 
         self.power_setpoint = pwr

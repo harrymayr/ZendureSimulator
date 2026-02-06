@@ -135,10 +135,10 @@ class ZendureSimulator:
                 timeBetweenUpdates = (t - starttime).total_seconds()
                 for d in self.devices.values():
                     # Update the totals
-                    simhome += d.power_setpoint
-                    d.homePower.update_value(d.power_setpoint)
                     d.solarPower.update_value(d.solar[i])
                     d.offGrid.update_value(d.offgrid[i])
+                    simhome += d.power_setpoint
+                    d.homePower.update_value(d.power_setpoint)
 
                     # update the running values
                     battery = d.homePower.asInt - d.solarPower.asInt + d.offGrid.asInt
@@ -149,10 +149,10 @@ class ZendureSimulator:
                     d.level = round(100 * d.availableKwh.asNumber / avail_max)
                     d.sim_level.append(round(100 * avail / d.kWh + d.minSoc.asNumber))
 
-                simp1 = (self.home[i] + self.p1[i]) - simhome + self.offgrid[i]
+                simp1 = self.home[i] - simhome 
 
-            self.sim_p1.append(simp1)
             distribution.update(simp1, t)
+            self.sim_p1.append(simp1)
             self.sim_home.append(sum(d.power_setpoint for d in self.devices.values()))
             starttime = t
 
