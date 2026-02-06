@@ -134,7 +134,6 @@ class Distribution:
                     solar += -off_grid
                 else:
                     setpoint += off_grid if d.homePower.asInt <= 0 else 0
-                d.power_offset = max(0, off_grid)
 
         return (setpoint, solar)
 

@@ -25,13 +25,12 @@ class ZendureDevice:
         self.name = deviceid
         self.batteries: dict[str, ZendureBattery | None] = {}
         self.kWh = 4.0
-        self.limit = [-2400, 2400]
+        self.limit = [-1200, 1200]
         self.level = 0
         self.fuseGrp: FuseGroup = FuseGroup(self.name, 3200, -3200, devices=[self])  # Default empty fuse group
         self.values = [0, 0, 0, 0]
         self.power_setpoint = 0
         self.power_time = datetime.min
-        self.power_offset = 0
         self.power_limit = 0
         self.status = DeviceState.ACTIVE
 
@@ -130,9 +129,9 @@ class ZendureDevice:
         #     else:
         #         return self.power_setpoint
 
-        pwr = power #+ self.power_offset
+        pwr = power 
         if (delta := abs(pwr - self.homePower.asInt)) <= SmartMode.POWER_TOLERANCE:
-            return self.homePower.asInt - self.power_offset
+            return self.homePower.asInt
         pwr = min(max(self.limit[0], pwr), self.limit[1])
 
         # adjust for bypass
@@ -144,4 +143,4 @@ class ZendureDevice:
         self.power_setpoint = pwr
         if power != self.power_setpoint:
             self.power_time = time + timedelta(seconds=3 + delta / 250)
-        return pwr + self.power_offset
+        return pwr
