@@ -133,8 +133,8 @@ class Distribution:
                 if (off_grid := d.offGrid.asInt) < 0:
                     solar += -off_grid
                 else:
-                    setpoint += off_grid if d.homePower.asInt <= 0 else 0
-
+                    setpoint += 0 #off_grid if d.homePower.asInt > off_grid else 0
+                    # 0 may not completely true, there is a missing offGrid value of the SF 800 after the SF 2400 battery is empty
         return (setpoint, solar)
 
     def distrbute(self, setpoint: int, idx: int, deviceWeight: Callable[[ZendureDevice], float], time: datetime) -> None:

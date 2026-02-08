@@ -121,7 +121,7 @@ class ZendureDevice:
             _LOGGER.error(f"SetLimits error {self.name} {charge} {discharge}!")
 
     def distribute(self, power: int, time: datetime) -> int:
-        """Set charge/discharge power, but correct for power offset."""
+        """Set charge/discharge power"""
         # if self.power_time != datetime.min and (delta := (self.power_time - time).total_seconds())> 0:
         #     if (delta < 1):
         #         self.homePower.update_value(self.power_setpoint)
@@ -138,7 +138,9 @@ class ZendureDevice:
             pwr = 0
         elif self.level <= 1 and self.offGrid is not None and self.offGrid.asInt <= 0:
             pwr = min(self.solarPower.asInt, pwr)
-
+        # I think we need to add here the offGrid power. For the SF 800 it can exceed the limit which limits outputHomePower
+        # but it cannot exceed HW limit of 1000W. Actually this HW limit is not available at this point (overwriten by inverseMaxPower)
+        # for the SF 2400 the inverseMaxPower limits the power in and out of the battery
         self.power_setpoint = pwr
         if power != self.power_setpoint:
             self.power_time = time + timedelta(seconds=3 + delta / 250)
