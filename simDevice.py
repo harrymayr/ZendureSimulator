@@ -35,7 +35,7 @@ class ZendureDevice:
         self.status = DeviceState.ACTIVE
 
         self.electricLevel = simEntity(self, "electricLevel")
-        self.homePowerZ = simEntity(self, "homePower")
+        self.homePower = simEntity(self, "homePower")
         self.batteryPower = simEntity(self, "batteryPower")
         self.solarPower = simEntity(self, "solarPower")
         self.offGrid = simEntity(self, "offGrid")
@@ -78,7 +78,7 @@ class ZendureDevice:
                     self.batteryUpdate()
                 elif bat and b:
                     bat.entityRead(b)
-        self.homePowerZ.update_value(-self.values[0] + self.values[1] + (min(self.offGrid.asInt, self.values[0] + self.values[3]) if self.offGrid is not None and self.offGrid.asInt > 0 else 0))
+        self.homePower.update_value(-self.values[0] + self.values[1] + (min(self.offGrid.asInt, self.values[0] + self.values[3]) if self.offGrid is not None and self.offGrid.asInt > 0 else 0))
 
     def batteryUpdate(self) -> None:
         """Update device based on battery status."""
@@ -124,13 +124,13 @@ class ZendureDevice:
         """Set charge/discharge power, but correct for power offset."""
         # if self.power_time != datetime.min and (delta := (self.power_time - time).total_seconds())> 0:
         #     if (delta < 1):
-        #         self.homePowerZ.update_value(self.power_setpoint)
+        #         self.homePower.update_value(self.power_setpoint)
         #     else:
         #         return self.power_setpoint
 
         pwr = power 
-        if (delta := abs(pwr - self.homePowerZ.asInt)) <= SmartMode.POWER_TOLERANCE:
-            return self.homePowerZ.asInt
+        if (delta := abs(pwr - self.homePower.asInt)) <= SmartMode.POWER_TOLERANCE:
+            return self.homePower.asInt
         pwr = min(max(self.limit[0], pwr), self.limit[1])
 
         # adjust for bypass

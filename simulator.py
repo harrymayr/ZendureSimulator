@@ -49,7 +49,7 @@ class ZendureSimulator:
                 if d.startindex == -1 and d.electricLevel.asInt > 0:
                     d.startindex = len(self.time)
                 d.levels.append(d.electricLevel.asInt)
-                home_total += d.homePowerZ.asInt
+                home_total += d.homePower.asInt
                 solar_total += d.solarPower.asInt
                 offgrid_total += d.offGrid.asInt
 
@@ -129,7 +129,7 @@ class ZendureSimulator:
                     d.availableKwh.update_value(d.kWh * (d.levels[d.startindex] - d.minSoc.asNumber) / 100)
                     avail_max = d.kWh * (d.socSet.asNumber - d.minSoc.asNumber) / 100
                     d.level = round(100 * d.availableKwh.asNumber / avail_max)
-                    d.homePowerZ.update_value(self.homeZ[d.startindex])
+                    d.homePower.update_value(self.homeZ[d.startindex])
                     d.solarPower.update_value(d.solar[d.startindex])
                     d.offGrid.update_value(d.offgrid[d.startindex])
                     d.sim_level.append(d.levels[d.startindex])
@@ -140,10 +140,10 @@ class ZendureSimulator:
                     d.solarPower.update_value(d.solar[i])
                     d.offGrid.update_value(d.offgrid[i])
                     simhome += d.power_setpoint
-                    d.homePowerZ.update_value(d.power_setpoint)
+                    d.homePower.update_value(d.power_setpoint)
 
                     # update the running values
-                    battery = d.homePowerZ.asInt - d.solarPower.asInt + d.offGrid.asInt
+                    battery = d.homePower.asInt - d.solarPower.asInt + d.offGrid.asInt
                     avail = d.availableKwh.asNumber - (battery / 3600000) * timeBetweenUpdates
                     avail_max = d.kWh * (d.socSet.asNumber - d.minSoc.asNumber) / 100
                     avail = max(0, min(avail, avail_max))

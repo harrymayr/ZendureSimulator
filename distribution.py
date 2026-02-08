@@ -126,14 +126,14 @@ class Distribution:
         for d in self.devices:
             if d.status != DeviceState.ACTIVE or d.fuseGrp is None:
                 continue
-            setpoint += d.homePowerZ.asInt
+            setpoint += d.homePower.asInt
             solar += d.solarPower.asInt
             d.fuseGrp.initPower = True
             if d.offGrid is not None:
                 if (off_grid := d.offGrid.asInt) < 0:
                     solar += -off_grid
                 else:
-                    setpoint += off_grid if d.homePowerZ.asInt <= 0 else 0
+                    setpoint += off_grid if d.homePower.asInt <= 0 else 0
 
         return (setpoint, solar)
 
@@ -148,7 +148,7 @@ class Distribution:
                 continue
             if (weight := deviceWeight(d)) == 0.0:
                 d.distribute(0, time)
-            elif d.homePowerZ.asInt == 0:
+            elif d.homePower.asInt == 0:
                 # Check if we must start this device
                 if startdevice := weight > 0 and start != 0:
                     start = self.Max[idx](0, int(start - d.limit[idx] * CONST_HIGH))
@@ -190,8 +190,8 @@ class Distribution:
 
     @staticmethod
     def sortcharge(d: ZendureDevice) -> float:
-        return d.level - (0 if d.homePowerZ.asInt == 0 else 3)
+        return d.level - (0 if d.homePower.asInt == 0 else 3)
 
     @staticmethod
     def sortdischarge(d: ZendureDevice) -> float:
-        return d.level + (0 if d.homePowerZ.asInt == 0 else 3)
+        return d.level + (0 if d.homePower.asInt == 0 else 3)

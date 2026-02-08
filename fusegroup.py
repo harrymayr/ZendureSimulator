@@ -32,12 +32,12 @@ class FuseGroup:
                 limit = 0
                 weight = 0
                 for fd in self.devices:
-                    if fd.homePowerZ.asInt != 0:
+                    if fd.homePower.asInt != 0:
                         limit += fd.limit[idx]
                         weight += (100 - fd.level) * fd.limit[idx]
                 avail = lim(self.limit[idx], limit)
                 for fd in self.devices:
-                    if fd.homePowerZ.asInt != 0:
+                    if fd.homePower.asInt != 0:
                         fd.power_limit = int(avail * ((100 - fd.level) * fd.limit[idx]) / weight) if weight < 0 else fd.limit[idx]
                         limit -= fd.limit[idx]
                         if limit > avail - fd.power_limit:
