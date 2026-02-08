@@ -134,9 +134,17 @@ def update_power_graph(data):
     
     fig.add_trace(go.Scatter(
         x=sim.time,
-        y=sim.home,
+        y=sim.homeC,
         mode='lines',
-        name='Home',
+        name='Home Consumption',
+        line=dict(color='black', width=2),
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=sim.time,
+        y=sim.homeZ,
+        mode='lines',
+        name='Home Zendure',
         line=dict(color='lightgray', width=2),
     ))
     
